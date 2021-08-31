@@ -1,0 +1,41 @@
+{
+  "name": "vinogradsoft/path",
+  "description": "Работа с путями",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "vinograd",
+      "email": "cmk.cmyk@mail.ru"
+    }
+  ],
+  "version": "1.0.0",
+  "minimum-stability": "stable",
+  "autoload": {
+    "psr-4": {
+      "Vinograd\\Path\\": [
+        "src/"
+      ]
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Test\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">=7.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "8.5.x-dev"
+  },
+  "repositories": [
+    {
+      "type": "composer",
+      "url": "https://asset-packagist.org"
+    }
+  ],
+  "scripts": {
+    "tests": "php ./vendor/bin/phpunit --colors=always tests",
+    "coverage": "XDEBUG_MODE=coverage phpunit --colors=always --coverage-html tests/coverage"
+  }
+}
