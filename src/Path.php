@@ -2,8 +2,6 @@
 
 namespace Vinograd\Path;
 
-use Vinograd\Path\Exception\InvalidPathException;
-
 /**
  * Class Path
  *
@@ -11,20 +9,6 @@ use Vinograd\Path\Exception\InvalidPathException;
  */
 class Path extends AbstractPath
 {
-
-    /** @var string */
-    protected $name;
-
-    /**
-     * Path constructor.
-     * @param string|null $source
-     */
-    public function __construct(string $source)
-    {
-        $this->source = rtrim($source, $this->getSeparator());
-        $this->name = basename($this->source);
-        parent::__construct($source);
-    }
 
     /**
      * @param string $source
@@ -101,7 +85,7 @@ class Path extends AbstractPath
     /**
      * @return string
      */
-    protected function getSeparator(): string
+    public function getSeparator(): string
     {
         return DIRECTORY_SEPARATOR;
     }

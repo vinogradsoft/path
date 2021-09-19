@@ -9,6 +9,9 @@ abstract class AbstractPath
     /** @var string */
     protected $source;
 
+    /** @var string */
+    protected $name;
+
     /** @var array */
     protected $directories;
 
@@ -18,7 +21,7 @@ abstract class AbstractPath
      */
     public function __construct(string $source)
     {
-        $this->split($this->source);
+        $this->setSource($source);
     }
 
     /**
@@ -29,7 +32,7 @@ abstract class AbstractPath
     /**
      * @return string
      */
-    abstract protected function getSeparator(): string;
+    abstract public function getSeparator(): string;
 
     /**
      *
@@ -42,6 +45,17 @@ abstract class AbstractPath
     public function getSource(): string
     {
         return $this->source;
+    }
+
+    /**
+     * @param string $source
+     */
+    public function setSource(string $source): void
+    {
+        $this->source = $source;
+        $this->source = rtrim($source, $this->getSeparator());
+        $this->name = basename($this->source);
+        $this->split($this->source);
     }
 
     /**
