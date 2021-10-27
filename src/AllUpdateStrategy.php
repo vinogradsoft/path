@@ -4,7 +4,11 @@ namespace Vinograd\Path;
 
 class AllUpdateStrategy implements UpdateStrategy
 {
-
+    /**
+     * @param array $items
+     * @param Url $url
+     * @return string
+     */
     public function updateAuthority(array $items, Url $url): string
     {
         $usrPass = '';
@@ -19,6 +23,12 @@ class AllUpdateStrategy implements UpdateStrategy
         return $result;
     }
 
+    /**
+     * @param array $items
+     * @param Url $url
+     * @param string $authority
+     * @return string
+     */
     public function updateBaseUrl(array $items, Url $url, string $authority): string
     {
         $result = !empty($items[Url::SCHEME]) ? $items[Url::SCHEME] . '://' : '';
@@ -26,17 +36,33 @@ class AllUpdateStrategy implements UpdateStrategy
         return $result;
     }
 
+    /**
+     * @param UrlQuery $query
+     * @param int $encodingType
+     */
     public function updateQuery(UrlQuery $query, int $encodingType): void
     {
         $query->setEncodingType($encodingType);
         $query->updateSource();
     }
 
+    /**
+     * @param Path $path
+     */
     public function updatePath(Path $path): void
     {
         $path->updateSource();
     }
 
+    /**
+     * @param array $items
+     * @param Url $url
+     * @param string $pathString
+     * @param Path|null $path
+     * @param string $queryString
+     * @param UrlQuery|null $query
+     * @return string
+     */
     public function updateRelativeUrl(
         array     $items,
         Url       $url,
@@ -52,6 +78,14 @@ class AllUpdateStrategy implements UpdateStrategy
         return $result;
     }
 
+    /**
+     * @param array $items
+     * @param Url $url
+     * @param string $relativeUrl
+     * @param string $baseUrl
+     * @param bool $hasPath
+     * @return string
+     */
     public function updateAbsoluteUrl(
         array  $items,
         Url    $url,
