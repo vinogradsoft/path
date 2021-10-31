@@ -13,13 +13,13 @@ PHP >=8.0
 Запустите команду
 
 ```
-php composer require vinogradsoft/path "1.1.0"
+php composer require vinogradsoft/path "2.0.0"
 ```
 
 или добавьте в composer.json
 
 ```
-"vinogradsoft/path": "^1.1.0"
+"vinogradsoft/path": "^2.0.0"
 ```
 ### Path
 
