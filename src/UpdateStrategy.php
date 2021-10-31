@@ -23,8 +23,8 @@ interface UpdateStrategy
      * @param array $items
      * @param Url $url
      * @param string $pathString
-     * @param Path|null $path
      * @param string $queryString
+     * @param UrlPath|null $path
      * @param UrlQuery|null $query
      * @return string
      */
@@ -32,21 +32,22 @@ interface UpdateStrategy
         array     $items,
         Url       $url,
         string    $pathString,
-        ?Path     $path = null,
         string    $queryString,
+        ?UrlPath  $path = null,
         ?UrlQuery $query = null
     ): string;
 
     /**
-     * @param UrlQuery $query
-     * @param int $encodingType PHP_QUERY_RFC1738 | PHP_QUERY_RFC3986
+     * @param array $items
+     * @return string
      */
-    public function updateQuery(UrlQuery $query, int $encodingType): void;
+    public function updateQuery(array $items): string;
 
     /**
-     * @param Path $path
+     * @param array $items
+     * @return string
      */
-    public function updatePath(Path $path): void;
+    public function updatePath(array $items): string;
 
     /**
      * @param array $items

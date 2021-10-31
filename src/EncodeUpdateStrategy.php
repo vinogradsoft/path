@@ -2,32 +2,40 @@
 
 namespace Vinograd\Path;
 
-class AllUpdateStrategy implements UpdateStrategy
+class EncodeUpdateStrategy implements UpdateStrategy
 {
     /**
-     * @param array $items
-     * @param Url $url
-     * @return string
+     * @inheritDoc
      */
     public function updateAuthority(array $items, Url $url): string
     {
         $usrPass = '';
         if (!empty($items[Url::USER]) && !empty($items[Url::PASSWORD])) {
-            $usrPass = $items[Url::USER] . ':' . $items[Url::PASSWORD] . '@';
+            $usrPass = rawurlencode($items[Url::USER]) . ':' . rawurlencode($items[Url::PASSWORD]) . '@';
         } elseif (!empty($items[Url::USER]) && empty($items[Url::PASSWORD])) {
-            $usrPass = $items[Url::USER] . '@';
+            $usrPass = rawurlencode($items[Url::USER]) . '@';
         }
+
         $result = $usrPass;
-        $result .= !empty($items[Url::HOST]) ? $items[Url::HOST] : '';
+        $result .= !empty($items[Url::HOST]) ? $this->idnToAscii($items[Url::HOST]) : '';
         $result .= !empty($items[Url::PORT]) ? ':' . $items[Url::PORT] : '';
         return $result;
     }
 
     /**
-     * @param array $items
-     * @param Url $url
-     * @param string $authority
+     * @param string $host
      * @return string
+     */
+    protected function idnToAscii(string $host): string
+    {
+        if (str_contains($host, '--')) {
+            return $host;
+        }
+        return idn_to_ascii($host) ?: $host;
+    }
+
+    /**
+     * @inheritDoc
      */
     public function updateBaseUrl(array $items, Url $url, string $authority): string
     {
@@ -37,54 +45,41 @@ class AllUpdateStrategy implements UpdateStrategy
     }
 
     /**
-     * @param UrlQuery $query
-     * @param int $encodingType
+     * @inheritDoc
      */
-    public function updateQuery(UrlQuery $query, int $encodingType): void
+    public function updateQuery(array $items): string
     {
-        $query->setEncodingType($encodingType);
-        $query->updateSource();
+        return http_build_query($items, '', '&', PHP_QUERY_RFC3986);
     }
 
     /**
-     * @param Path $path
+     * @inheritDoc
      */
-    public function updatePath(Path $path): void
+    public function updatePath(array $items): string
     {
-        $path->updateSource();
+        return rawurlencode(implode('/', $items));
     }
 
     /**
-     * @param array $items
-     * @param Url $url
-     * @param string $pathString
-     * @param Path|null $path
-     * @param string $queryString
-     * @param UrlQuery|null $query
-     * @return string
+     * @inheritDoc
      */
     public function updateRelativeUrl(
         array     $items,
         Url       $url,
         string    $pathString,
-        ?Path     $path = null,
         string    $queryString,
+        ?UrlPath  $path = null,
         ?UrlQuery $query = null
     ): string
     {
         $result = !empty($pathString) ? $pathString : '';
         $result .= !empty($queryString) ? '?' . $queryString : '';
-        $result .= !empty($items[Url::FRAGMENT]) ? '#' . $items[Url::FRAGMENT] : '';
+        $result .= !empty($items[Url::FRAGMENT]) ? '#' . rawurlencode($items[Url::FRAGMENT]) : '';
         return $result;
     }
 
     /**
-     * @param array $items
-     * @param Url $url
-     * @param string $relativeUrl
-     * @param string $baseUrl
-     * @param bool $hasPath
-     * @return string
+     * @inheritDoc
      */
     public function updateAbsoluteUrl(
         array  $items,

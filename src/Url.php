@@ -50,29 +50,103 @@ class Url extends AbstractPath
     protected ?string $relativeUrl = null;
     protected ?string $authorityUrl = null;
 
-    protected UpdateStrategy $strategy;
-    protected Path $path;
+    protected UpdateStrategy $currentUpdateStrategy;
+    protected UpdateStrategy $encodeUpdateStrategy;
+    protected UpdateStrategy $rawUpdateStrategy;
+    protected UrlPath $path;
     protected UrlQuery $urlQuery;
-
-    /**
-     * @var int PHP_QUERY_RFC1738 | PHP_QUERY_RFC3986
-     */
-    protected int $encodingType = PHP_QUERY_RFC1738;
+    protected bool $encodeState = true;
 
     /**
      * @param string $source
-     * @param UpdateStrategy|null $strategy
+     * @param bool $encodeState
+     * @param UpdateStrategy|null $encodeUpdateStrategy
+     * @param UpdateStrategy|null $rawUpdateStrategy
      */
-    public function __construct(string $source, ?UpdateStrategy $strategy = null)
+    public function __construct(
+        string          $source,
+        bool            $encodeState = true,
+        ?UpdateStrategy $encodeUpdateStrategy = null,
+        ?UpdateStrategy $rawUpdateStrategy = null
+    )
     {
-        if ($strategy !== null) {
-            $this->strategy = $strategy;
-        } else {
-            $this->strategy = new AllUpdateStrategy();
-        }
-        $this->path = $this->createPath();
-        $this->urlQuery = $this->createQuery();
+        $this->encodeUpdateStrategy = $encodeUpdateStrategy ?? new EncodeUpdateStrategy();
+        $this->rawUpdateStrategy = $rawUpdateStrategy ?? new RawUpdateStrategy();
+        $this->encodeState = $encodeState;
+
+        $this->currentUpdateStrategy = $encodeState ? $this->encodeUpdateStrategy : $this->rawUpdateStrategy;
+        $this->path = $this->createPath($this->currentUpdateStrategy);
+        $this->urlQuery = $this->createQuery($this->currentUpdateStrategy);
         parent::__construct($source);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEncode(): bool
+    {
+        return $this->encodeState;
+    }
+
+    /**
+     * @param bool $encode
+     */
+    public function setEncode(bool $encode): void
+    {
+        if ($this->encodeState === $encode) {
+            return;
+        }
+
+        $this->currentUpdateStrategy = $encode ? $this->encodeUpdateStrategy : $this->rawUpdateStrategy;
+        $this->path->setStrategy($this->currentUpdateStrategy);
+        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
+        $this->encodeState = $encode;
+        $this->discardOnNonWhole();
+    }
+
+    /**
+     * @param UpdateStrategy $encodeUpdateStrategy
+     */
+    public function setEncodeUpdateStrategy(UpdateStrategy $encodeUpdateStrategy): void
+    {
+        $this->encodeUpdateStrategy = $encodeUpdateStrategy;
+        if (!$this->encodeState) {
+            return;
+        }
+
+        $this->currentUpdateStrategy = $encodeUpdateStrategy;
+        $this->path->setStrategy($this->currentUpdateStrategy);
+        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
+        $this->discardOnNonWhole();
+    }
+
+    /**
+     * @param UpdateStrategy $rawUpdateStrategy
+     */
+    public function setRawUpdateStrategy(UpdateStrategy $rawUpdateStrategy): void
+    {
+        $this->rawUpdateStrategy = $rawUpdateStrategy;
+        if ($this->encodeState) {
+            return;
+        }
+
+        $this->currentUpdateStrategy = $rawUpdateStrategy;
+        $this->path->setStrategy($this->currentUpdateStrategy);
+        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
+        $this->discardOnNonWhole();
+    }
+
+    /**
+     * @return void
+     */
+    protected function discardOnNonWhole(): void
+    {
+        $this->authoritySate &= ~self::HOST_KEY;
+        $this->authoritySate &= ~self::USER_KEY;
+        $this->authoritySate &= ~self::PASSWORD_KEY;
+        $this->relativeUrlState &= ~self::QUERY_KEY;
+        $this->relativeUrlState &= ~self::PATH_KEY;
+        $this->relativeUrlState &= ~self::FRAGMENT_KEY;
     }
 
     /**
@@ -91,9 +165,8 @@ class Url extends AbstractPath
     public function setSource(string $source): void
     {
         $this->resetState();
-        $this->source = rawurldecode(rtrim($source, $this->getSeparator()));
-        $this->parse($this->source);
-        $this->updateSource(false);
+        $this->parse(rawurldecode(rtrim($source, $this->getSeparator())));
+        $this->updateSource();
     }
 
     /**
@@ -126,16 +199,16 @@ class Url extends AbstractPath
             $this->schemeState = false;
         }
         if (isset($data['user'])) {
-            $this->items[self::USER] = $data['user'];
+            $this->items[self::USER] = rawurldecode($data['user']);
             $this->authoritySate &= ~self::USER_KEY;
         }
         if (isset($data['pass'])) {
-            $this->items[self::PASSWORD] = $data['pass'];
+            $this->items[self::PASSWORD] = rawurldecode($data['pass']);
             $this->authoritySate &= ~self::PASSWORD_KEY;
         }
 
         if (isset($data['host'])) {
-            $this->items[self::HOST] = $data['host'];
+            $this->items[self::HOST] = rawurldecode($data['host']);
             $this->authoritySate &= ~self::HOST_KEY;
         }
 
@@ -155,7 +228,7 @@ class Url extends AbstractPath
         }
 
         if (isset($data['fragment'])) {
-            $this->items[self::FRAGMENT] = $data['fragment'];
+            $this->items[self::FRAGMENT] = rawurldecode($data['fragment']);
             $this->relativeUrlState &= ~self::FRAGMENT_KEY;
         }
     }
@@ -224,9 +297,9 @@ class Url extends AbstractPath
     }
 
     /**
-     * @return Path|null
+     * @return UrlPath|null
      */
-    public function getPath(): ?Path
+    public function getPath(): ?UrlPath
     {
         $path = $this->path->getSource();
         if (empty($path)) {
@@ -258,27 +331,37 @@ class Url extends AbstractPath
     }
 
     /**
-     * @return Path
+     * @param UpdateStrategy $strategy
+     * @return UrlPath
      */
-    protected function createPath(): Path
+    protected function createPath(UpdateStrategy $strategy): UrlPath
     {
         static $prototypePath;
-        if ($prototypePath === null) {
-            $class = Path::class;
+        if (!$prototypePath instanceof UrlPath) {
+            $class = UrlPath::class;
+            /** @var UrlPath $prototypePath */
             $prototypePath = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
+            $prototypePath->setStrategy($strategy);
+        } elseif (!$prototypePath->equalsStrategy($strategy)) {
+            $prototypePath->setStrategy($strategy);
         }
         return clone $prototypePath;
     }
 
     /**
+     * @param UpdateStrategy $strategy
      * @return UrlQuery
      */
-    protected function createQuery(): UrlQuery
+    protected function createQuery(UpdateStrategy $strategy): UrlQuery
     {
         static $prototypeQuery;
-        if ($prototypeQuery === null) {
+        if (!$prototypeQuery instanceof UrlQuery) {
             $class = UrlQuery::class;
+            /** @var UrlQuery $prototypeQuery */
             $prototypeQuery = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
+            $prototypeQuery->setStrategy($strategy);
+        } elseif (!$prototypeQuery->equalsStrategy($strategy)) {
+            $prototypeQuery->setStrategy($strategy);
         }
         return clone $prototypeQuery;
     }
@@ -419,15 +502,7 @@ class Url extends AbstractPath
      */
     public function getParameter(string|int $name): mixed
     {
-        return $this->urlQuery->getParamByName($name);
-    }
-
-    /**
-     * @param int $encodingType PHP_QUERY_RFC1738 | PHP_QUERY_RFC3986
-     */
-    public function setEncodingType(int $encodingType)
-    {
-        $this->encodingType = $encodingType;
+        return $this->urlQuery->getValueByName($name);
     }
 
     /**
@@ -452,28 +527,28 @@ class Url extends AbstractPath
     public function updateSource(bool $updateAbsoluteUrl = true): void
     {
         if ($this->authoritySate !== self::AUTHORITY_WHOLE) {
-            $this->authorityUrl = $this->strategy->updateAuthority($this->items, $this);
+            $this->authorityUrl = $this->currentUpdateStrategy->updateAuthority($this->items, $this);
         }
 
         if ($this->authoritySate !== self::AUTHORITY_WHOLE || $this->schemeState === false) {
-            $this->baseUrl = $this->strategy->updateBaseUrl($this->items, $this, $this->authorityUrl);
+            $this->baseUrl = $this->currentUpdateStrategy->updateBaseUrl($this->items, $this, $this->authorityUrl);
         }
 
         if (!($this->relativeUrlState & self::QUERY_KEY)) {
-            $this->strategy->updateQuery($this->urlQuery, $this->encodingType);
+            $this->urlQuery->updateSource();
         }
 
         if (!($this->relativeUrlState & self::PATH_KEY)) {
-            $this->strategy->updatePath($this->path);
+            $this->path->updateSource();
         }
 
         if ($this->relativeUrlState !== self::RELATIVE_URL_WHOLE) {
-            $this->relativeUrl = $this->strategy->updateRelativeUrl(
+            $this->relativeUrl = $this->currentUpdateStrategy->updateRelativeUrl(
                 $this->items,
                 $this,
                 (string)$this->path,
-                $this->path,
                 (string)$this->urlQuery,
+                $this->path,
                 $this->urlQuery
             );
         }
@@ -485,10 +560,10 @@ class Url extends AbstractPath
             || $this->schemeState === false
             || $this->relativeUrlState !== self::RELATIVE_URL_WHOLE) {
 
-            $this->source = $this->strategy->updateAbsoluteUrl(
+            $this->source = $this->currentUpdateStrategy->updateAbsoluteUrl(
                 $this->items,
                 $this,
-                $this->relativeUrl,
+                (string)$this->relativeUrl,
                 $this->baseUrl,
                 !empty($this->path->getSource())
             );
