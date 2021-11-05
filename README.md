@@ -1,7 +1,6 @@
 # Path
 
-Библиотека для работы с путями и url. 
-Альфа-версия тестами не покрыта.
+Библиотека для работы с путями и url.
 
 PHP >=8.0
 
@@ -56,51 +55,97 @@ path/to/file.txt
 
 Схема показывает какие данные можно получать и модифицировать.
 ```
-     |------------------------------------absolute url--------------------------------|
-     |                                                                                |
-     |----------------base url-----------------|--------------relative url------------|
-     |                                         |                                      |
-     |                    authority            |      path          query    fragment |
-     |       /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\|/‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾\ |
-      http://grigor:password@vinograd.soft:8080/path/to/resource?query=value#fragment
-      \__/   \___/  \_____/  \___________/ \__/
-     scheme  user  password      host      port
+  |---------------------------------------absolute url---------------------------------|
+  |                                                                                    |
+  |-----------------base url----------------|------------------relative url------------|
+  |                                         |                                          |
+  |                    authority            |          path            query   fragment|
+  |       /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\|/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾\|
+  |http://grigor:password@vinograd.soft:8080/path/to/resource.json?query=value#fragment|
+   \__/   \___/  \_____/  \___________/ \__/                  \___/
+  scheme  user   password     host      port                  suffix
 ```
 
 ```php 
 <?php
-ini_set('error_reporting', E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 require_once dirname(__DIR__, 1) . '/vendor/autoload.php';
 
 use \Vinograd\Path\Url;
 
-$url = new Url('http://path.local');
+$url = Url::createBlank();
 
-$url->setEncodingType(PHP_QUERY_RFC3986);
-$url->setPath('user/index')
-    ->setScheme('https')
+$url->setScheme('https')
     ->setUser('grigor')
-    ->setPassword('password')
+    ->setPassword('pass@word')
+    ->setHost('host.ru')
     ->setPort('8088')
-    ->addParameter('name', [
-        'value 1',
-        'value 2',
-        'value 3',
-    ])
-    ->setFragment('fragment');
+    ->setPath('/user/index')
+    ->setSuffix('.php')
+    ->setArrayQuery([
+        'key1' => 'value1',
+        'key2' => 'value2'
+    ])->setFragment('fragment');
+
 $url->updateSource();
 
-echo '<br>', $url->getAuthority();
-echo '<br>', $url->getBaseUrl();
-echo '<br>', $url->getRelativeUrl();
-echo '<br>', $url; //$url->getSource();
+printUrl($url);
+echo '<br><br>####################################';
+
+$url = new Url('https://grigor:pass%40word@host.ru:8088/user/index?key1=value1&key2=value2#fragment');
+$url->setSuffix('.php');
+$url->updateSource();
+
+printUrl($url);
+
+function printUrl($url)
+{
+    echo '<br><b>Authority:</b> ', $url->getAuthority();
+    echo '<br><b>BaseUrl:</b> ', $url->getBaseUrl();
+    echo '<br><b>RelativeUrl:</b> ', $url->getRelativeUrl();
+    echo '<br><b>AbsoluteUrl:</b> ', $url; //$url->getSource();
+    echo '<br>';
+
+    echo '<br><b>getScheme:</b> ', $url->getScheme();
+    echo '<br><b>getUser:</b> ', $url->getUser();
+    echo '<br><b>getPassword:</b> ', $url->getPassword();
+    echo '<br><b>getHost:</b> ', $url->getHost();
+    echo '<br><b>getPort:</b> ', $url->getPort();
+    echo '<br><b>getPath:</b> ', $url->getPath();
+    echo '<br><b>getSuffix:</b> ', $url->getSuffix();
+    echo '<br><b>getQuery:</b> ', $url->getQuery();
+    echo '<br><b>getFragment:</b> ', $url->getFragment();
+}
 ```
 Результат:
 ``` 
-grigor:password@path.local:8088
-https://grigor:password@path.local:8088
-user/index?name%5B0%5D=value%201&name%5B1%5D=value%202&name%5B2%5D=value%203#fragment
-https://grigor:password@path.local:8088/user/index?name%5B0%5D=value%201&name%5B1%5D=value%202&name%5B2%5D=value%203#fragment
+Authority: grigor:pass%40word@host.ru:8088
+BaseUrl: https://grigor:pass%40word@host.ru:8088
+RelativeUrl: /user/index.php?key1=value1&key2=value2#fragment
+AbsoluteUrl: https://grigor:pass%40word@host.ru:8088/user/index.php?key1=value1&key2=value2#fragment
+
+getScheme: https
+getUser: grigor
+getPassword: pass@word
+getHost: host.ru
+getPort: 8088
+getPath: /user/index.php
+getSuffix: .php
+getQuery: key1=value1&key2=value2
+getFragment: fragment
+
+####################################
+Authority: grigor:pass%40word@host.ru:8088
+BaseUrl: https://grigor:pass%40word@host.ru:8088
+RelativeUrl: /user/index.php?key1=value1&key2=value2#fragment
+AbsoluteUrl: https://grigor:pass%40word@host.ru:8088/user/index.php?key1=value1&key2=value2#fragment
+
+getScheme: https
+getUser: grigor
+getPassword: pass@word
+getHost: host.ru
+getPort: 8088
+getPath: /user/index.php
+getSuffix: .php
+getQuery: key1=value1&key2=value2
+getFragment: fragment
 ```
