@@ -2,15 +2,20 @@
 
 namespace Vinograd\Path;
 
+use Vinograd\Path\Exception\InvalidPathException;
+use Vinograd\Path\Exception\InvalidUrlException;
+
 /**
  *
- *    |----------------base url-----------------|--------------relative url------------|
- *    |                                         |                                      |
- *    |scheme              authority            |      path          query    fragment |
- *    |/‾‾\    /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\|/‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾\ |
- *     http://grigor:password@vinograd.soft:8080/path/to/resource?query=value#fragment
- *            \___/  \_____/  \___________/ \__/
- *            user  password      host      port
+ *          |--------------------------------------absolute url-----------------------------------|
+ *          |                                                                                     |
+ *          |----------------base url----------------|------------------relative url--------------|
+ *          |                                        |                                            |
+ *          |                   authority            |          path            query    fragment |
+ *          |      /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\|/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾‾‾‾\ /‾‾‾‾‾‾\ |
+ *          http://grigor:password@vinograd.soft:8080/path/to/resource.json?query=value#fragment
+ *          \__/   \___/  \_____/  \___________/ \__/                 \___/
+ *         scheme  user   password     host      port                 suffix
  */
 class Url extends AbstractPath
 {
@@ -23,6 +28,9 @@ class Url extends AbstractPath
     const HOST = 3;
     const PORT = 4;
     const FRAGMENT = 5;
+    const PATH = 6;
+    const QUERY = 7;
+    const SUFFIX = 8;
 
     /**
      * key state
@@ -50,97 +58,99 @@ class Url extends AbstractPath
     protected ?string $relativeUrl = null;
     protected ?string $authorityUrl = null;
 
-    protected UpdateStrategy $currentUpdateStrategy;
-    protected UpdateStrategy $encodeUpdateStrategy;
-    protected UpdateStrategy $rawUpdateStrategy;
+    protected UrlStrategy $updateStrategy;
+
     protected UrlPath $path;
     protected UrlQuery $urlQuery;
-    protected bool $encodeState = true;
+    protected bool $isIdnToAscii = false;
 
     /**
      * @param string $source
-     * @param bool $encodeState
-     * @param UpdateStrategy|null $encodeUpdateStrategy
-     * @param UpdateStrategy|null $rawUpdateStrategy
+     * @param bool $isIdnToAscii
+     * @param UrlStrategy|null $updateStrategy
      */
     public function __construct(
-        string          $source,
-        bool            $encodeState = true,
-        ?UpdateStrategy $encodeUpdateStrategy = null,
-        ?UpdateStrategy $rawUpdateStrategy = null
+        string       $source,
+        bool         $isIdnToAscii = false,
+        ?UrlStrategy $updateStrategy = null
     )
     {
-        $this->encodeUpdateStrategy = $encodeUpdateStrategy ?? new EncodeUpdateStrategy();
-        $this->rawUpdateStrategy = $rawUpdateStrategy ?? new RawUpdateStrategy();
-        $this->encodeState = $encodeState;
-
-        $this->currentUpdateStrategy = $encodeState ? $this->encodeUpdateStrategy : $this->rawUpdateStrategy;
-        $this->path = $this->createPath($this->currentUpdateStrategy);
-        $this->urlQuery = $this->createQuery($this->currentUpdateStrategy);
+        $this->initUrl($isIdnToAscii, $updateStrategy);
         parent::__construct($source);
+    }
+
+    /**
+     * @param bool $isIdnToAscii
+     * @param UrlStrategy|null $updateStrategy
+     * @return $this
+     */
+    protected function initUrl(
+        bool         $isIdnToAscii = false,
+        ?UrlStrategy $updateStrategy = null
+    ): static
+    {
+        $this->isIdnToAscii = $isIdnToAscii;
+        $this->updateStrategy = $updateStrategy ?? new DefaultUrlStrategy();
+        $this->path = UrlPath::createBlank($this->updateStrategy);
+        $this->urlQuery = UrlQuery::createBlank($this->updateStrategy);
+        return $this;
+    }
+
+    /**
+     * @param bool $isIdnToAscii
+     * @param UrlStrategy|null $updateStrategy
+     * @return static
+     */
+    public static function createBlank(bool $isIdnToAscii = false, ?UrlStrategy $updateStrategy = null): static
+    {
+        static $prototype;
+        if ($prototype === null) {
+            $class = Url::class;
+            /** @var Url $prototype */
+            $prototype = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
+            $prototype->source = '';
+            $prototype->baseUrl = '';
+            $prototype->relativeUrl = '';
+            $prototype->authorityUrl = '';
+            $prototype->items = [];
+        }
+        return (clone $prototype)->initUrl($isIdnToAscii, $updateStrategy);
     }
 
     /**
      * @return bool
      */
-    public function isEncode(): bool
+    public function isConversionIdnToAscii(): bool
     {
-        return $this->encodeState;
+        return $this->isIdnToAscii;
     }
 
     /**
-     * @param bool $encode
+     * @param bool $conversion
+     * @return Url
      */
-    public function setEncode(bool $encode): void
+    public function setConversionIdnToAscii(bool $conversion): static
     {
-        if ($this->encodeState === $encode) {
+        if ($this->isIdnToAscii === $conversion) {
+            return $this;
+        }
+        $this->isIdnToAscii = $conversion;
+        $this->authoritySate &= ~self::HOST_KEY;
+        return $this;
+    }
+
+    /**
+     * @param UrlStrategy $updateStrategy
+     */
+    public function setUpdateStrategy(UrlStrategy $updateStrategy): void
+    {
+        if ($this->updateStrategy === $updateStrategy) {
             return;
         }
 
-        $this->currentUpdateStrategy = $encode ? $this->encodeUpdateStrategy : $this->rawUpdateStrategy;
-        $this->path->setStrategy($this->currentUpdateStrategy);
-        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
-        $this->encodeState = $encode;
-        $this->discardOnNonWhole();
-    }
-
-    /**
-     * @param UpdateStrategy $encodeUpdateStrategy
-     */
-    public function setEncodeUpdateStrategy(UpdateStrategy $encodeUpdateStrategy): void
-    {
-        $this->encodeUpdateStrategy = $encodeUpdateStrategy;
-        if (!$this->encodeState) {
-            return;
-        }
-
-        $this->currentUpdateStrategy = $encodeUpdateStrategy;
-        $this->path->setStrategy($this->currentUpdateStrategy);
-        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
-        $this->discardOnNonWhole();
-    }
-
-    /**
-     * @param UpdateStrategy $rawUpdateStrategy
-     */
-    public function setRawUpdateStrategy(UpdateStrategy $rawUpdateStrategy): void
-    {
-        $this->rawUpdateStrategy = $rawUpdateStrategy;
-        if ($this->encodeState) {
-            return;
-        }
-
-        $this->currentUpdateStrategy = $rawUpdateStrategy;
-        $this->path->setStrategy($this->currentUpdateStrategy);
-        $this->urlQuery->setStrategy($this->currentUpdateStrategy);
-        $this->discardOnNonWhole();
-    }
-
-    /**
-     * @return void
-     */
-    protected function discardOnNonWhole(): void
-    {
+        $this->updateStrategy = $updateStrategy;
+        $this->path->setStrategy($this->updateStrategy);
+        $this->urlQuery->setStrategy($this->updateStrategy);
         $this->authoritySate &= ~self::HOST_KEY;
         $this->authoritySate &= ~self::USER_KEY;
         $this->authoritySate &= ~self::PASSWORD_KEY;
@@ -150,9 +160,17 @@ class Url extends AbstractPath
     }
 
     /**
+     * @return UrlStrategy
+     */
+    public function getUpdateStrategy(): UrlStrategy
+    {
+        return $this->updateStrategy;
+    }
+
+    /**
      *
      */
-    public function resetState(): void
+    protected function resetState(): void
     {
         $this->authoritySate = self::AUTHORITY_WHOLE;
         $this->schemeState = true;
@@ -192,7 +210,10 @@ class Url extends AbstractPath
     {
 
         $this->reset();
-        $data = parse_url($source);
+
+        if (!$data = parse_url($source)) {
+            throw new InvalidUrlException(sprintf('Valid url or part of it is expected. $source - %s', $source));
+        }
 
         if (isset($data['scheme'])) {
             $this->items[self::SCHEME] = $data['scheme'];
@@ -290,22 +311,10 @@ class Url extends AbstractPath
     /**
      * @return string|null
      */
-    public function getPathString(): ?string
+    public function getPath(): ?string
     {
         $path = $this->path->getSource();
         return !empty($path) ? $path : null;
-    }
-
-    /**
-     * @return UrlPath|null
-     */
-    public function getPath(): ?UrlPath
-    {
-        $path = $this->path->getSource();
-        if (empty($path)) {
-            return null;
-        }
-        return clone $this->path;
     }
 
     /**
@@ -331,59 +340,55 @@ class Url extends AbstractPath
     }
 
     /**
-     * @param UpdateStrategy $strategy
-     * @return UrlPath
+     * @param array $items
+     * @return void
      */
-    protected function createPath(UpdateStrategy $strategy): UrlPath
+    public function setAll(array $items): void
     {
-        static $prototypePath;
-        if (!$prototypePath instanceof UrlPath) {
-            $class = UrlPath::class;
-            /** @var UrlPath $prototypePath */
-            $prototypePath = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
-            $prototypePath->setStrategy($strategy);
-        } elseif (!$prototypePath->equalsStrategy($strategy)) {
-            $prototypePath->setStrategy($strategy);
-        }
-        return clone $prototypePath;
-    }
+        $this->authoritySate &= ~self::HOST_KEY;
+        $this->authoritySate &= ~self::USER_KEY;
+        $this->authoritySate &= ~self::PASSWORD_KEY;
+        $this->relativeUrlState &= ~self::QUERY_KEY;
+        $this->relativeUrlState &= ~self::PATH_KEY;
+        $this->relativeUrlState &= ~self::FRAGMENT_KEY;
 
-    /**
-     * @param UpdateStrategy $strategy
-     * @return UrlQuery
-     */
-    protected function createQuery(UpdateStrategy $strategy): UrlQuery
-    {
-        static $prototypeQuery;
-        if (!$prototypeQuery instanceof UrlQuery) {
-            $class = UrlQuery::class;
-            /** @var UrlQuery $prototypeQuery */
-            $prototypeQuery = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
-            $prototypeQuery->setStrategy($strategy);
-        } elseif (!$prototypeQuery->equalsStrategy($strategy)) {
-            $prototypeQuery->setStrategy($strategy);
+        if (empty($items)) {
+            $this->reset();
+            return;
         }
-        return clone $prototypeQuery;
+
+        $this->items[self::SCHEME] = $items[self::SCHEME] ?? '';
+        $this->items[self::USER] = $items[self::USER] ?? '';
+        $this->items[self::PASSWORD] = $items[self::PASSWORD] ?? '';
+        $this->items[self::HOST] = $items[self::HOST] ?? '';
+        $this->items[self::PORT] = $items[self::PORT] ?? '';
+
+        if (isset($items[self::PATH])) {
+            $this->path->setAll($items[self::PATH]);
+        } else {
+            $this->path->reset();
+        }
+
+        if (isset($items[self::SUFFIX])) {
+            $this->path->setSuffix($items[self::SUFFIX]);
+        }
+
+        if (isset($items[self::QUERY])) {
+            $this->urlQuery->setAll($items[self::QUERY]);
+        } else {
+            $this->urlQuery->reset();
+        }
+
+        $this->items[self::FRAGMENT] = $items[self::FRAGMENT] ?? '';
     }
 
     /**
      * @return string|null
      */
-    public function getQueryString(): ?string
+    public function getQuery(): ?string
     {
         $query = $this->urlQuery->getSource();
         return !empty($query) ? $query : null;
-    }
-
-    /**
-     * @return UrlQuery|null
-     */
-    public function getQuery(): ?UrlQuery
-    {
-        if (empty($this->urlQuery->getSource())) {
-            return null;
-        }
-        return clone $this->urlQuery;
     }
 
     /**
@@ -489,7 +494,7 @@ class Url extends AbstractPath
      * @param mixed $value
      * @return $this
      */
-    public function addParameter(string $name, mixed $value): static
+    public function setParameter(string $name, mixed $value): static
     {
         $this->urlQuery->setParam($name, $value);
         $this->relativeUrlState &= ~self::QUERY_KEY;
@@ -497,10 +502,10 @@ class Url extends AbstractPath
     }
 
     /**
-     * @param string|int $name
+     * @param string $name
      * @return mixed
      */
-    public function getParameter(string|int $name): mixed
+    public function getParameter(string $name): mixed
     {
         return $this->urlQuery->getValueByName($name);
     }
@@ -522,16 +527,57 @@ class Url extends AbstractPath
     }
 
     /**
+     * @return string|null
+     */
+    public function getSuffix(): ?string
+    {
+        return $this->path->getSuffix();
+    }
+
+    /**
+     * @param string|null $suffix
+     * @return Url
+     */
+    public function setSuffix(?string $suffix): static
+    {
+        if ($this->path->equalsSuffix($suffix)) {
+            return $this;
+        }
+        $this->path->setSuffix($suffix);
+        $this->relativeUrlState &= ~self::PATH_KEY;
+        return $this;
+    }
+
+    /**
+     * @return void
+     */
+    private function validateBaseUrlData(): void
+    {
+        if (empty($this->items[self::HOST])
+            && (!empty($this->items[self::PORT]) || !empty($this->items[self::USER]) || !empty($this->items[self::PASSWORD]))) {
+            throw new InvalidUrlException('Invalid parameters for the formation of the authority.');
+        }
+        if (empty($this->items[self::HOST]) && !empty($this->items[self::SCHEME])
+            || !empty($this->items[self::HOST]) && empty($this->items[self::SCHEME])) {
+            throw new InvalidUrlException('Incorrect parameters for forming url');
+        }
+    }
+
+    /**
      * @inheritDoc
      */
-    public function updateSource(bool $updateAbsoluteUrl = true): void
+    public function updateSource(bool $updateAbsoluteUrl = true, ?string $suffix = null): void
     {
+        if ($suffix) {
+            $this->setSuffix($suffix);
+        }
         if ($this->authoritySate !== self::AUTHORITY_WHOLE) {
-            $this->authorityUrl = $this->currentUpdateStrategy->updateAuthority($this->items, $this);
+            $this->authorityUrl = $this->updateStrategy->updateAuthority($this->items, $this, $this->isIdnToAscii);
         }
 
         if ($this->authoritySate !== self::AUTHORITY_WHOLE || $this->schemeState === false) {
-            $this->baseUrl = $this->currentUpdateStrategy->updateBaseUrl($this->items, $this, $this->authorityUrl);
+            $this->validateBaseUrlData();
+            $this->baseUrl = $this->updateStrategy->updateBaseUrl($this->items, $this, $this->authorityUrl, $this->isIdnToAscii);
         }
 
         if (!($this->relativeUrlState & self::QUERY_KEY)) {
@@ -543,13 +589,14 @@ class Url extends AbstractPath
         }
 
         if ($this->relativeUrlState !== self::RELATIVE_URL_WHOLE) {
-            $this->relativeUrl = $this->currentUpdateStrategy->updateRelativeUrl(
+            $this->relativeUrl = $this->updateStrategy->updateRelativeUrl(
                 $this->items,
                 $this,
                 (string)$this->path,
                 (string)$this->urlQuery,
                 $this->path,
-                $this->urlQuery
+                $this->urlQuery,
+                $suffix
             );
         }
         if (!$updateAbsoluteUrl) {
@@ -560,12 +607,14 @@ class Url extends AbstractPath
             || $this->schemeState === false
             || $this->relativeUrlState !== self::RELATIVE_URL_WHOLE) {
 
-            $this->source = $this->currentUpdateStrategy->updateAbsoluteUrl(
+            $this->source = $this->updateStrategy->updateAbsoluteUrl(
                 $this->items,
                 $this,
                 (string)$this->relativeUrl,
                 $this->baseUrl,
-                !empty($this->path->getSource())
+                !empty($this->path->getSource()),
+                $this->isIdnToAscii,
+                $suffix
             );
 
         }

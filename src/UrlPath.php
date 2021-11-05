@@ -2,26 +2,76 @@
 
 namespace Vinograd\Path;
 
+use Vinograd\Path\Exception\InvalidPathException;
+
 class UrlPath extends AbstractPath
 {
-    protected UpdateStrategy $strategy;
+    protected UrlPathStrategy $strategy;
+    protected ?string $suffix = null;
 
     /**
      * @param string $source
-     * @param UpdateStrategy $strategy
+     * @param UrlPathStrategy|null $strategy
      */
-    public function __construct(string $source, UpdateStrategy $strategy)
+    public function __construct(string $source, ?UrlPathStrategy $strategy = null)
     {
-        $this->strategy = $strategy;
+        $this->assertNotEmpty($source);
+        $this->initUrlPath($strategy);
         parent::__construct($source);
     }
 
     /**
-     * @param UpdateStrategy $strategy
+     * @param $source
+     * @return void
      */
-    public function setStrategy(UpdateStrategy $strategy): void
+    private function assertNotEmpty($source)
+    {
+        if (empty($source)) {
+            throw new InvalidPathException('Source UrlPath cannot be empty.');
+        }
+    }
+
+    /**
+     * @param UrlPathStrategy|null $strategy
+     * @return $this
+     */
+    protected function initUrlPath(?UrlPathStrategy $strategy = null): static
+    {
+        $this->strategy = $strategy ?? new DefaultUrlPathStrategy();
+        return $this;
+    }
+
+    /**
+     * @param UrlPathStrategy|null $strategy
+     * @return static
+     */
+    public static function createBlank(?UrlPathStrategy $strategy = null): static
+    {
+        static $prototypePath;
+        if (!$prototypePath instanceof UrlPath) {
+            $class = UrlPath::class;
+            /** @var UrlPath $prototypePath */
+            $prototypePath = unserialize(sprintf('O:%d:"%s":0:{}', \strlen($class), $class));
+            $prototypePath->items = [];
+            $prototypePath->source = '';
+        }
+        return (clone $prototypePath)->initUrlPath($strategy);
+    }
+
+    /**
+     * @param UrlPathStrategy $strategy
+     */
+    public function setStrategy(UrlPathStrategy $strategy): void
     {
         $this->strategy = $strategy;
+    }
+
+    /**
+     * @return UrlPathStrategy
+     */
+    public function getStrategy(): UrlPathStrategy
+    {
+        return $this->strategy;
     }
 
     /**
@@ -29,7 +79,12 @@ class UrlPath extends AbstractPath
      */
     protected function parse(string $source)
     {
+        if (empty($source)) {
+            $this->reset();
+            return;
+        }
         $this->items = explode('/', $source);
+        $this->updateSource();
     }
 
     /**
@@ -41,20 +96,45 @@ class UrlPath extends AbstractPath
     }
 
     /**
-     * @param UpdateStrategy $strategy
+     * @param UrlStrategy $strategy
      * @return bool
      */
-    public function equalsStrategy(UpdateStrategy $strategy): bool
+    public function equalsStrategy(UrlStrategy $strategy): bool
     {
         return $this->strategy === $strategy;
     }
 
     /**
-     * @inheritDoc
+     * @param string|null $suffix
+     * @return bool
+     */
+    public function equalsSuffix(?string $suffix): bool
+    {
+        return $this->suffix === $suffix;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getSuffix(): ?string
+    {
+        return $this->suffix;
+    }
+
+    /**
+     * @param string|null $suffix
+     */
+    public function setSuffix(?string $suffix): void
+    {
+        $this->suffix = $suffix;
+    }
+
+    /**
+     * @return void
      */
     public function updateSource(): void
     {
-        $this->source = $this->strategy->updatePath($this->items);
+        $this->source = $this->strategy->updatePath($this->items, $this->suffix);
     }
 
     /**
@@ -64,6 +144,7 @@ class UrlPath extends AbstractPath
     {
         $this->source = '';
         $this->items = [];
+        $this->suffix = null;
         return $this;
     }
 
@@ -72,8 +153,14 @@ class UrlPath extends AbstractPath
      */
     public function setSource(string $source): void
     {
-        $this->source = $source;
-        $this->source = rtrim($source, $this->getSeparator());
-        $this->parse($this->source);
+        $this->parse(rtrim($source, $this->getSeparator()));
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setAll(array $items): void
+    {
+        $this->items = $items;
     }
 }

@@ -2,13 +2,16 @@
 
 namespace Vinograd\Path;
 
-class EncodeUpdateStrategy implements UpdateStrategy
+class DefaultUrlStrategy implements UrlStrategy
 {
     /**
      * @inheritDoc
      */
-    public function updateAuthority(array $items, Url $url): string
+    public function updateAuthority(array $items, Url $url, bool $idn = false): string
     {
+        if (empty($items[Url::HOST])) {
+            return '';
+        }
         $usrPass = '';
         if (!empty($items[Url::USER]) && !empty($items[Url::PASSWORD])) {
             $usrPass = rawurlencode($items[Url::USER]) . ':' . rawurlencode($items[Url::PASSWORD]) . '@';
@@ -17,7 +20,7 @@ class EncodeUpdateStrategy implements UpdateStrategy
         }
 
         $result = $usrPass;
-        $result .= !empty($items[Url::HOST]) ? $this->idnToAscii($items[Url::HOST]) : '';
+        $result .= $idn ? $this->idnToAscii($items[Url::HOST]) : $items[Url::HOST];
         $result .= !empty($items[Url::PORT]) ? ':' . $items[Url::PORT] : '';
         return $result;
     }
@@ -37,11 +40,15 @@ class EncodeUpdateStrategy implements UpdateStrategy
     /**
      * @inheritDoc
      */
-    public function updateBaseUrl(array $items, Url $url, string $authority): string
+    public function updateBaseUrl(array $items, Url $url, string $authority, bool $idn = false): string
     {
-        $result = !empty($items[Url::SCHEME]) ? $items[Url::SCHEME] . '://' : '';
-        $result .= $authority;
-        return $result;
+        if (empty($authority)) {
+            return '';
+        }
+        if (empty($items[Url::SCHEME])) {
+            return '';
+        }
+        return $items[Url::SCHEME] . '://' . $authority;
     }
 
     /**
@@ -55,26 +62,30 @@ class EncodeUpdateStrategy implements UpdateStrategy
     /**
      * @inheritDoc
      */
-    public function updatePath(array $items): string
+    public function updatePath(array $items, ?string $suffix = null): string
     {
-        return rawurlencode(implode('/', $items));
+        if (empty($items)) {
+            return '';
+        }
+        return $suffix ? implode('/', $items) . $suffix : implode('/', $items);
     }
 
     /**
      * @inheritDoc
      */
     public function updateRelativeUrl(
-        array     $items,
-        Url       $url,
-        string    $pathString,
-        string    $queryString,
-        ?UrlPath  $path = null,
-        ?UrlQuery $query = null
+        array    $items,
+        Url      $url,
+        string   $pathString,
+        string   $queryString,
+        UrlPath  $path,
+        UrlQuery $query,
+        ?string  $suffix = null
     ): string
     {
         $result = !empty($pathString) ? $pathString : '';
         $result .= !empty($queryString) ? '?' . $queryString : '';
-        $result .= !empty($items[Url::FRAGMENT]) ? '#' . rawurlencode($items[Url::FRAGMENT]) : '';
+        $result .= !empty($items[Url::FRAGMENT]) ? '#' . $items[Url::FRAGMENT] : '';
         return $result;
     }
 
@@ -82,14 +93,19 @@ class EncodeUpdateStrategy implements UpdateStrategy
      * @inheritDoc
      */
     public function updateAbsoluteUrl(
-        array  $items,
-        Url    $url,
-        string $relativeUrl,
-        string $baseUrl,
-        bool   $hasPath
+        array   $items,
+        Url     $url,
+        string  $relativeUrl,
+        string  $baseUrl,
+        bool    $hasPath,
+        bool    $idn = false,
+        ?string $suffix = null
     ): string
     {
-        return $baseUrl . '/' . ltrim($relativeUrl, '/');
+        if(empty($baseUrl)){
+            return '';
+        }
+        return !empty($relativeUrl) ? $baseUrl . '/' . ltrim($relativeUrl, '/') : $baseUrl;
     }
 
 }
