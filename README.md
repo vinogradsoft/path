@@ -1,5 +1,7 @@
 # Path
 
+[![codecov](https://codecov.io/gh/vinogradsoft/path/branch/master/graph/badge.svg?token=H05QAU54L4)](https://codecov.io/gh/vinogradsoft/path)
+
 Библиотека для работы с путями и url.
 
 PHP >=8.0
