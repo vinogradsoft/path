@@ -2,22 +2,17 @@
 
 namespace Vinograd\Path;
 
-use Vinograd\Path\Exception\InvalidPathException;
-
-abstract class AbstractPath
+abstract class AbstractPath implements \Stringable
 {
     /** @var string */
-    protected $source;
-
-    /** @var string */
-    protected $name;
+    protected string $source;
 
     /** @var array */
-    protected $directories;
+    protected array $items;
 
     /**
      * Path constructor.
-     * @param string|null $source
+     * @param string $source
      */
     public function __construct(string $source)
     {
@@ -27,7 +22,7 @@ abstract class AbstractPath
     /**
      * @param string $source
      */
-    abstract protected function split(string $source);
+    abstract protected function parse(string $source);
 
     /**
      * @return string
@@ -40,6 +35,11 @@ abstract class AbstractPath
     abstract public function updateSource(): void;
 
     /**
+     * @return $this
+     */
+    abstract public function reset(): static;
+
+    /**
      * @return string
      */
     public function getSource(): string
@@ -50,109 +50,25 @@ abstract class AbstractPath
     /**
      * @param string $source
      */
-    public function setSource(string $source): void
-    {
-        $this->source = $source;
-        $this->source = rtrim($source, $this->getSeparator());
-        $this->name = basename($this->source);
-        $this->split($this->source);
-    }
-
-    /**
-     * @param int $idx
-     * @return string
-     */
-    public function get(int $idx): string
-    {
-        $this->assertOfBounds($idx,
-            'All elements in the path have an index less than the requested one.',
-            'Index cannot be less than 0.');
-        return $this->directories[$idx];
-    }
-
-    /**
-     * @param int $idx
-     * @param string $newValue
-     */
-    public function set(int $idx, string $newValue): void
-    {
-        $this->assertOfBounds($idx,
-            'The change could not be completed. All elements in the path have a lower index.',
-            'Index cannot be less than 0.');
-        $this->directories[$idx] = $newValue;
-    }
-
-    /**
-     * @param int $idx
-     * @param string $moreCardinalityMessage
-     * @param string $negativeMessage
-     */
-    protected function assertOfBounds(int $idx, string $moreCardinalityMessage, string $negativeMessage)
-    {
-        if (count($this->directories) <= $idx) {
-            throw new InvalidPathException($moreCardinalityMessage);
-        }
-        if (0 > $idx) {
-            throw new InvalidPathException($negativeMessage);
-        }
-    }
+    abstract public function setSource(string $source): void;
 
     /**
      * @return array
      */
     public function getAll(): array
     {
-        return $this->directories;
+        return $this->items;
     }
 
     /**
      * @param array $items
      */
-    public function setAll(array $items): void
-    {
-        if (empty($items)) {
-            throw new  InvalidPathException('The path cannot be changed, there must be at least one element.');
-        }
-        $this->directories = $items;
-    }
-
-    /**
-     * @param string $currentValue
-     * @param string $newValue
-     */
-    public function setBy(string $currentValue, string $newValue): void
-    {
-        if (!$idx = $this->getIndex($currentValue)) {
-            throw new InvalidPathException(sprintf('You are trying to replace "%s" with "%s", but there is no such item in the path.', $currentValue, $newValue));
-        }
-        $this->directories[$idx] = $newValue;
-    }
-
-    /**
-     * @param string $name
-     * @return int|null
-     */
-    public function getIndex(string $name): ?int
-    {
-        if (!$this->contains($name)) {
-            return null;
-        }
-        return array_search($name, $this->directories, true);
-    }
-
-    /**
-     * @param string $directoryName
-     * @return bool
-     */
-    public function contains(string $directoryName): bool
-    {
-        return in_array($directoryName, $this->directories, true);
-    }
+    abstract public function setAll(array $items): void;
 
     /**
      * @return string
      */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->source;
     }

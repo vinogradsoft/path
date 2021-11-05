@@ -222,4 +222,14 @@ class PathTest extends TestCase
         self::assertEquals('/src/Scanner/Driver/File/index.php',
             new Path('/src/Scanner/Driver/File/index.php'));
     }
+
+    public function testReset()
+    {
+        $path = new Path('/src/Scanner/Driver/File/index.php');
+        $path->reset();
+
+        self::assertEmpty($path->getSource());
+        self::assertEmpty($path->getName());
+        self::assertEmpty($path->getAll());
+    }
 }
