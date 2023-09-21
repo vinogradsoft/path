@@ -2,7 +2,6 @@
 
 namespace Vinograd\Path;
 
-use Vinograd\Path\Exception\InvalidPathException;
 use Vinograd\Path\Exception\InvalidUrlException;
 
 /**
@@ -22,15 +21,15 @@ class Url extends AbstractPath
     /**
      * reserved array indices
      */
-    const SCHEME = 0;
-    const USER = 1;
-    const PASSWORD = 2;
-    const HOST = 3;
-    const PORT = 4;
-    const FRAGMENT = 5;
-    const PATH = 6;
-    const QUERY = 7;
-    const SUFFIX = 8;
+    const SCHEME = ':scheme';
+    const USER = ':user';
+    const PASSWORD = ':password';
+    const HOST = ':host';
+    const PORT = ':port';
+    const FRAGMENT = '#';
+    const PATH = ':path';
+    const QUERY = '?';
+    const SUFFIX = ':suffix';
 
     /**
      * key state
@@ -192,14 +191,14 @@ class Url extends AbstractPath
      */
     public function reset(): static
     {
-        $this->items[self::SCHEME] = '';
-        $this->items[self::USER] = '';
-        $this->items[self::PASSWORD] = '';
-        $this->items[self::HOST] = '';
-        $this->items[self::PORT] = '';
+        $this->resetState();
         $this->path->reset();
         $this->urlQuery->reset();
-        $this->items[self::FRAGMENT] = '';
+        $this->items = [];
+        $this->source = '';
+        $this->baseUrl = null;
+        $this->relativeUrl = null;
+        $this->authorityUrl = null;
         return $this;
     }
 

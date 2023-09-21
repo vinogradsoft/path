@@ -193,14 +193,66 @@ class UrlTest extends TestCase
         $path = $this->getValue($url, 'path');
         $urlQuery = $this->getValue($url, 'urlQuery');
         $items = $this->getValue($url, 'items');
+        $baseUrl = $this->getValue($url, 'baseUrl');
+        $relativeUrl = $this->getValue($url, 'relativeUrl');
+        $authorityUrl = $this->getValue($url, 'authorityUrl');
         self::assertEmpty($path->getSource());
         self::assertEmpty($urlQuery->getSource());
-        self::assertEmpty($items[Url::SCHEME]);
-        self::assertEmpty($items[Url::USER]);
-        self::assertEmpty($items[Url::PASSWORD]);
-        self::assertEmpty($items[Url::HOST]);
-        self::assertEmpty($items[Url::PORT]);
-        self::assertEmpty($items[Url::FRAGMENT]);
+        self::assertEmpty($items);
+        self::assertEmpty($baseUrl);
+        self::assertEmpty($relativeUrl);
+        self::assertEmpty($authorityUrl);
+    }
+
+    public function testRepeatReset()
+    {
+        $url = new Url('http://vinograd.soft/path/to/resource');
+        $url->setSuffix('.json');
+        $url->updateSource();
+        self::assertEquals('http://vinograd.soft/path/to/resource.json', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.soft/path/to');
+        $url->updateSource();
+        self::assertEquals('http://vinograd.soft/path/to', $url->getSource());
+
+        $url->reset();
+        $url->setSource('ftp://vinograd.soft');
+        $url->setArrayPath(['path','to']);
+        $url->setScheme('https');
+        $url->updateSource();
+        self::assertEquals('https://vinograd.soft/path/to', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.soft');
+        $url->setArrayQuery(['path'=>'to']);
+        $url->updateSource();
+        self::assertEquals('http://vinograd.soft/?path=to', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.ru');
+        $url->setUser('grigor');
+        $url->setPassword('password');
+        $url->updateSource();
+        self::assertEquals('http://grigor:password@vinograd.ru', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.ru');
+        $url->setPassword('password2');
+        $url->updateSource();
+        self::assertEquals('http://vinograd.ru', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.ru');
+        $url->setFragment('fragment');
+        $url->updateSource();
+        self::assertEquals('http://vinograd.ru/#fragment', $url->getSource());
+
+        $url->reset();
+        $url->setSource('http://vinograd.ru');
+        $url->setPort(80);
+        $url->updateSource();
+        self::assertEquals('http://vinograd.ru:80', $url->getSource());
     }
 
     public function testGetHost()

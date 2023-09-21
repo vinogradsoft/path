@@ -64,7 +64,7 @@ class Path extends AbstractPath
     /**
      * @param array $searchReplace
      */
-    public function replaceAll(array $searchReplace)
+    public function replaceAll(array $searchReplace): void
     {
         foreach ($searchReplace as $search => $replace) {
             $this->replace($search, $replace);
@@ -72,10 +72,11 @@ class Path extends AbstractPath
     }
 
     /**
-     * @param $search
-     * @param $replace
+     * @param string $search
+     * @param string $replace
+     * @return void
      */
-    public function replace($search, $replace): void
+    public function replace(string $search, string $replace): void
     {
         foreach ($this->items as $idx => $part) {
             $this->replaceIn($idx, $search, $replace, $part);
@@ -83,12 +84,13 @@ class Path extends AbstractPath
     }
 
     /**
-     * @param $idx
-     * @param $search
-     * @param $replace
-     * @param $part
+     * @param int $idx
+     * @param string $search
+     * @param string $replace
+     * @param string $part
+     * @return void
      */
-    private function replaceIn($idx, $search, $replace, $part)
+    private function replaceIn(int $idx, string $search, string $replace, string $part): void
     {
         $this->items[$idx] = str_replace($search, $replace, $part);
     }
