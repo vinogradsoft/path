@@ -14,21 +14,18 @@ PHP >=8.0
 Запустите команду
 
 ```
-php composer require vinogradsoft/path "2.0.0"
+php composer require vinogradsoft/path "2.1.0"
 ```
 
 или добавьте в composer.json
 
 ```
-"vinogradsoft/path": "^2.0.0"
+"vinogradsoft/path": "^2.1.0"
 ```
 ### Path
 
 ```php 
 <?php
-ini_set('error_reporting', E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 
 use Vinograd\Path\Path;
 
@@ -55,7 +52,7 @@ path/to/file.txt
 
 ### Добавилась поддержка URL. 
 
-Поддержка рассчитана на генерацию url в различных билдерах. Не предполагалась реализация Psr7 и не будет.
+Поддержка рассчитана на генерацию url в различных билдерах.
 Схема показывает какие данные можно получать и модифицировать.
 ```
   |---------------------------------------absolute url---------------------------------|
