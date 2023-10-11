@@ -251,6 +251,10 @@ class Url extends AbstractPath
             $this->items[self::FRAGMENT] = rawurldecode($data['fragment']);
             $this->relativeUrlState &= ~self::FRAGMENT_KEY;
         }
+
+        if (!isset($data['host']) && !isset($data['scheme'])) {
+            throw new InvalidUrlException(sprintf('Valid url or part of it is expected. $source - %s', $source));
+        }
     }
 
     /**
