@@ -4,7 +4,7 @@
 
 Библиотека для работы с путями и url.
 
-> Перерожденный репозиторий [vinogradsoft/compass] (https://github.com/vinogradsoft/compass). Все проекты этого аккаунта использующие эту библиотеку будут обновлены для работы с `vinogradsoft/compass`.
+> Перерожденный репозиторий [vinogradsoft/compass](https://github.com/vinogradsoft/compass). Все проекты этого аккаунта использующие эту библиотеку будут обновлены для работы с `vinogradsoft/compass`.
 
 PHP >=8.0
 
